@@ -1,10 +1,21 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from sqlalchemy import create_engine, text
 
+from app.load import load
+
 engine = create_engine(os.environ["DATABASE_URL"])
-app = FastAPI(title="Envira loss experience")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    load(engine, os.environ["DATA_DIR"])
+    yield
+
+
+app = FastAPI(title="Envira loss experience", lifespan=lifespan)
 
 
 @app.get("/health")
