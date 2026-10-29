@@ -182,4 +182,7 @@ cython_debug/
 
 # Mac
 .DS_Store
-CLAUDE.md
+
+#Challenge requirements
+/data
+/envira-loss-data.zip
