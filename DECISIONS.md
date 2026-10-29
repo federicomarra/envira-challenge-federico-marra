@@ -57,6 +57,17 @@ Trivial choices (Claude): an APIRouter in report.py like loss_experience.py.
 # 6 over-engineering pass (Claude, ponytail review):
 Cut: the 188-line GitHub .gitignore template (now 8 lines), the unused SERIAL ids on excluded_rows/flagged_rows (and RESTART IDENTITY), the datetime→date loop in load.py (Postgres casts timestamp to DATE on insert), the ORDER_BY dict, README psql count blocks that /report replaces, and duplicate asserts in test_report.py. Rejected (my call): replacing database/Dockerfile with a compose volume mount.
 
+# 7 Filters on /report, backlog item 4 (core/app/report.py):
+My choices: filters on /report only (loss endpoints unchanged); `?underwriting_year=`, `?region=`, `?asset_type=`, one value each, ANDed; `loaded` and `flagged` count the slice; `excluded` always covers the whole load, because excluded rows were never loaded and so have no policy to place them (today: 260 orphan claims); no match gives 200 with 0 counts and `flagged: []`.
+Semantics:
+- Underwriting year = the policy's inception year (BRIEF). A claim takes its policy's year, region and asset type.
+- Policy flags are placed by their policy, claim flags by claim → policy → asset.
+- Assets have no underwriting year, so `loaded.assets` uses region and asset_type only; fx_rates is always the total.
+- Unknown region or asset_type gives 422; an unknown year is just an empty slice.
+Plausibility: term-overlap flags sit on the later policy, so per year they are 0 (2022), 1,433 / 6,045 policies (2023) and 495 / 1,031 (2024). That is expected from the rule, not a filter bug.
+Independent check: tests/test_report.py recounts one slice (2023 × Hovedstaden × residential: 157 assets, 231 policies, 81 claims, 29 peril fixes, 3 negative paids) from the raw CSVs with stdlib csv. It also checks that for each filter, the slices over every value add back up to the unfiltered flags, policies and claims, so no row is lost or counted twice. Unfiltered /report output is byte-identical to before.
+Trivial choices (Claude): snake_case param names, matching the CSV columns; region/asset_type values reused from load.py's REGIONS/ASSET_TYPES (Swagger dropdowns); one shared POLICY_MATCH SQL fragment with NULL means "no filter", rather than building SQL in Python.
+
 # **What I built**
 
 # **What I deliberately did not build, and why**

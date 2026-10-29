@@ -93,7 +93,27 @@ Add `?excluded_ids=true` to also list the excluded row ids:
 curl -s "localhost:8000/report?excluded_ids=true"
 ```
 
-Interactive API docs, where the `order` options appear as a dropdown: http://localhost:8000/docs
+Filter to a slice of the book. Each filter is optional and takes one value, and filters combine with AND. An unknown `region` or `asset_type` returns 422:
+
+| param | keeps |
+|---|---|
+| `underwriting_year` | policies incepting in that year, and their claims |
+| `region` | `Hovedstaden`, `Midtjylland`, `Nordjylland`, `Sjaelland`, `Syddanmark` |
+| `asset_type` | `agricultural`, `commercial`, `industrial`, `public`, `residential` |
+
+Filters narrow `loaded` and `flagged`. A claim takes its policy's year, region and asset type. Assets have no underwriting year, so `loaded.assets` uses only `region` and `asset_type`, and `fx_rates` is always the total. `excluded` always covers the whole load, because excluded rows were never loaded and nothing places them in a slice. If no policy matches, counts are 0 and `flagged` is `[]`.
+
+```bash
+curl -s "localhost:8000/report?underwriting_year=2024&region=Sjaelland"
+```
+
+```text
+{"loaded":{"assets":840,"policies":209,"claims":89,"fx_rates":168},
+ "excluded":[{"source_file":"claims.csv","reason":"orphan policy_id","count":260}],
+ "flagged":[{"source_file":"policies.csv","issue":"term overlaps","count":94}, ...]}
+```
+
+Interactive API docs, where the `order`, `region` and `asset_type` options appear as dropdowns: http://localhost:8000/docs
 
 Inspect the database (published on 127.0.0.1:5432 only):
 
@@ -123,12 +143,12 @@ docker compose down
 │   │   ├── load.py                # CSV cleaning + load into Postgres on startup
 │   │   ├── loss_experience.py     # SQL + GET /portfolios/{id}/loss-experience, GET /portfolios/loss-experience
 │   │   ├── main.py                # App, startup load, GET /health, mounts the loss_experience and report routers
-│   │   └── report.py              # GET /report: excluded / flagged counts per reason (+ excluded ids on request)
+│   │   └── report.py              # GET /report: excluded / flagged counts per reason (+ excluded ids on request), filterable by underwriting year, region, asset type
 │   ├── tests/
 │   │   ├── test_health.py         # pytest, against the real DB
 │   │   ├── test_load.py           # DB vs independent stdlib-csv recount; bad-row exclusion
 │   │   ├── test_loss_experience.py # both endpoints vs independent stdlib-csv recompute (every portfolio x peril, every portfolio, book, ranking)
-│   │   └── test_report.py         # GET /report vs independent stdlib-csv recount (orphan claims + ids, peril fixes)
+│   │   └── test_report.py         # GET /report vs independent stdlib-csv recount (orphan claims + ids; one filtered slice; slices per filter add up to the whole)
 │   ├── pyproject.toml             # Dependencies (uv)
 │   ├── uv.lock                    # Locked dependency versions
 │   ├── .dockerignore
