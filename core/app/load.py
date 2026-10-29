@@ -117,9 +117,6 @@ def clean(data_dir):
     fx_rates = fx_rates.assign(month=month, rate_dkk_per_unit=rate)
 
     tables = {"assets": assets, "policies": policies, "claims": claims, "fx_rates": fx_rates}  # FK order
-    for df in tables.values():
-        for col in df.select_dtypes("datetime").columns:
-            df[col] = df[col].dt.date
     return tables, pd.concat(excluded, ignore_index=True), pd.concat(flagged, ignore_index=True)
 
 
@@ -127,7 +124,7 @@ def load(engine, data_dir):
     """Replace everything in the DB with a fresh load of the CSVs, in one transaction (safe on restart)."""
     tables, excluded, flagged = clean(data_dir)
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE assets, policies, claims, fx_rates, excluded_rows, flagged_rows RESTART IDENTITY"))
+        conn.execute(text("TRUNCATE assets, policies, claims, fx_rates, excluded_rows, flagged_rows"))
         for name, df in [*tables.items(), ("excluded_rows", excluded), ("flagged_rows", flagged)]:
             df.to_sql(name, conn, if_exists="append", index=False)
     log.info("Loaded %s; excluded %d rows; flagged %d issues",

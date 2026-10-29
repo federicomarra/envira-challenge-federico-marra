@@ -39,7 +39,6 @@ CREATE TABLE fx_rates (
 );
 
 CREATE TABLE excluded_rows (
-    id          SERIAL PRIMARY KEY,
     source_file TEXT NOT NULL,  -- e.g. 'claims.csv'
     row_id      TEXT NOT NULL,  -- the row's own id, e.g. claim_id
     reason      TEXT NOT NULL
@@ -47,7 +46,6 @@ CREATE TABLE excluded_rows (
 
 -- Rows that were loaded but fixed or look suspicious; one entry per issue.
 CREATE TABLE flagged_rows (
-    id          SERIAL PRIMARY KEY,
     source_file TEXT NOT NULL,
     row_id      TEXT NOT NULL,
     reason      TEXT NOT NULL

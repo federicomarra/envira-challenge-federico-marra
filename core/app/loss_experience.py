@@ -57,9 +57,6 @@ LEFT JOIN (SELECT portfolio_id, sum(incurred_dkk) AS incurred, count(*) AS claim
            FROM clm GROUP BY ROLLUP (portfolio_id)) c ON c.portfolio_id IS NOT DISTINCT FROM p.portfolio_id
 """)
 
-# ?order= value -> field it sorts by, descending.
-ORDER_BY = {"loss_ratio": "loss_ratio", "dkk_lost": "dkk_lost", "largest_claim": "largest_claim_dkk"}
-
 
 @router.get("/portfolios/loss-experience")
 def portfolios_loss_experience(
@@ -78,7 +75,7 @@ def portfolios_loss_experience(
         rows = conn.execute(PORTFOLIOS).mappings().all()
     book = next(dict(r) for r in rows if r["portfolio_id"] is None)
     del book["portfolio_id"]
-    key = ORDER_BY[order]
+    key = "largest_claim_dkk" if order == "largest_claim" else order
     portfolios = sorted((r for r in rows if r["portfolio_id"] is not None),
                         key=lambda r: (-(r[key] or 0), r["portfolio_id"]))
     return {"order": order, "book": book, "portfolios": portfolios}

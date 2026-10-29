@@ -87,10 +87,10 @@ curl -s localhost:8000/report
  "flagged":[{"source_file":"policies.csv","issue":"term overlaps","count":1928}, ...]}
 ```
 
-Add `?excludedIDs=true` to also list the excluded row ids:
+Add `?excluded_ids=true` to also list the excluded row ids:
 
 ```bash
-curl -s "localhost:8000/report?excludedIDs=true"
+curl -s "localhost:8000/report?excluded_ids=true"
 ```
 
 Interactive API docs, where the `order` options appear as a dropdown: http://localhost:8000/docs
@@ -99,16 +99,6 @@ Inspect the database (published on 127.0.0.1:5432 only):
 
 ```bash
 docker compose exec db psql -U envira -d envira -c '\dt'
-```
-
-The same counts as `GET /report`, straight from the tables (each row also has its full reason and row id):
-
-```bash
-docker compose exec db psql -U envira -d envira -c "select reason, count(*) from excluded_rows group by 1"
-```
-
-```bash
-docker compose exec db psql -U envira -d envira -c "select split_part(reason, ':', 1) as issue, count(*) from flagged_rows group by 1 order by 2 desc"
 ```
 
 Run the tests (needs `db` running; `test_load.py` reloads the DB from `./data`):

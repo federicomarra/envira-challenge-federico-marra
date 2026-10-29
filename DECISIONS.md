@@ -10,7 +10,7 @@ Schema: only cleaned data. assets/policies/claims/fx_rates typed (NUMERIC money,
 Data policy: see # 2.
 No volume: ephemeral DB, fresh every start.
 Postgres published on 127.0.0.1:5432 only (for local tests).
-Credentials: .env (already gitignored, line 131) + committed .env.example.
+Credentials: .env (gitignored) + committed .env.example.
 Backend: Python 3.12, uv + pyproject + uv.lock, SQLAlchemy Core + psycopg, port 8000.
 Data loading happens in core on startup (see # 2).
 /health runs SELECT 1; test hits a real DB.
@@ -46,13 +46,16 @@ One query: the pol/clm CTEs (FX + incurred rules) are now shared by both endpoin
 Plausibility: portfolio LRs run 0.645–1.040, book 0.803. Only PF-03 is above 1, losing 262,739 DKK. Loss ratio and dkk_lost agree on the order except for a PF-04/PF-06 swap. By largest claim, PF-01 comes second (363k): that's CLM-901444, so it depends on the abs() sign decision in # 3.
 Independent check: tests/test_loss_experience.py rolls the stdlib recompute up per portfolio and for the book, compares every field, and checks the order for all three ?order values. The item-1 tests are unchanged and still pass, which shows the CTE refactor didn't move any number. Curl matched the profiling numbers computed from the raw CSVs before the code was written.
 Trivial choices (Claude): names IN_DKK, PORTFOLIOS, dkk_lost; sorting in Python (12 rows) rather than a SQL CASE.
-Layout (Claude): both loss endpoints + their SQL live in app/loss_experience.py as an APIRouter mounted by main.py. Named loss_experience.py, not loss-experience.py: a hyphen is not importable in Python. The engine moved to app/db.py so loss_experience.py and main.py can both import it without a circular import; main.py still exposes `engine` (test_load.py imports it from there).
+Layout (Claude): both loss endpoints + their SQL live in app/loss_experience.py as an APIRouter mounted by main.py. Named loss_experience.py, not loss-experience.py: a hyphen is not importable in Python. The engine moved to app/db.py so loss_experience.py and main.py can both import it without a circular import.
 
 # 5 GET /report, data-quality report (core/app/report.py):
 Reads the excluded_rows / flagged_rows written by the load (# 2): `loaded` row counts per table, `excluded` (dropped) as count per file + reason, `flagged` (kept, but fixed or suspicious) as count per file + issue (reason prefix before ":"). Today: 260 excluded (orphan claims), 5,640 flags over 7 issues.
-Row ids (my choice): `?excludedIDs=true` (default false) adds the excluded claim ids. Flagged ids are never listed (5,640 rows); they stay queryable in flagged_rows.
-Independent check: tests/test_report.py recounts the orphan claims (count + ids) and the peril fixes from the raw CSVs with stdlib csv; the full flag recount is already in test_load.py.
-Trivial choices (Claude): an APIRouter in report.py like loss_experience.py; Python param excluded_ids aliased to excludedIDs.
+Row ids (my choice): `?excluded_ids=true` (default false, snake_case like `?order=`) adds the excluded claim ids. Flagged ids are never listed (5,640 rows); they stay queryable in flagged_rows.
+Independent check: tests/test_report.py recounts the orphan claims (count + ids) from the raw CSVs with stdlib csv and checks the 7 flag issues are listed; the full flag recount is already in test_load.py.
+Trivial choices (Claude): an APIRouter in report.py like loss_experience.py.
+
+# 6 over-engineering pass (Claude, ponytail review):
+Cut: the 188-line GitHub .gitignore template (now 8 lines), the unused SERIAL ids on excluded_rows/flagged_rows (and RESTART IDENTITY), the datetime→date loop in load.py (Postgres casts timestamp to DATE on insert), the ORDER_BY dict, README psql count blocks that /report replaces, and duplicate asserts in test_report.py. Rejected (my call): replacing database/Dockerfile with a compose volume mount.
 
 # **What I built**
 

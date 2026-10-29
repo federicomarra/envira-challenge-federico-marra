@@ -9,8 +9,8 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+from app.db import engine
 from app.load import clean, load
-from app.main import engine
 
 DATA = Path(os.environ["DATA_DIR"])
 
