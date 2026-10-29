@@ -31,7 +31,7 @@ Not flagged: claim currency != policy currency (859), expected per BRIEF.
 Independent check: tests/test_load.py recounts every table, exclusion and flag from the raw CSVs with stdlib csv and compares to the DB.
 Trivial choices (Claude): clean() (pure, testable) + load() (DB) split; summary logged to uvicorn's logger; validation of unexpected rows covered by a tiny tmp_path CSV test.
 
-# 3 GET /portfolios/{portfolio_id}/loss-experience (core/app/main.py, one SQL query):
+# 3 GET /portfolios/{portfolio_id}/loss-experience (core/app/loss_experience.py, one SQL query):
 Per peril: policy_count, earned_premium_dkk (full annual premium), incurred_loss_dkk (settled = paid, open = paid + reserve, withdrawn/declined = 0), loss_ratio (incurred / earned, 4 dp), claim_count and largest_claim_dkk (open + settled only, so incurred / count is average severity). Money rounded to 2 dp. Unknown portfolio -> 404.
 FX: premium at the month-end rate of its inception month, claim at the month-end rate of its reported month. EUR only moves 7.43-7.46, so the choice changes the book LR by < 0.01%. EUR labels checked as genuine: the DKK/EUR premium-rate ratio per peril is ~7.45.
 Policies and claims are grouped per peril separately and then joined, so a policy's premium is never multiplied by its claim count.
@@ -39,13 +39,20 @@ Sensitivity: the negative-paid policy is the one that moves the answer. Book LR 
 Plausibility: across all 60 portfolio x peril cells, LR ranges 0.25-3.62 (nothing > 10x or ~0). Fire runs highest in every portfolio (up to 3.6); that's a finding, not a data error.
 Independent check: tests/test_loss_experience.py recomputes every portfolio x peril from the raw CSVs with stdlib csv (no SQL, no pandas, no app.load) and compares all six fields. PF-01 subsidence is also pinned to hand-checked figures. Curl output for PF-01 matched the hand computation done before the code was written.
 
-# 4 GET /portfolios/loss-experience (core/app/main.py):
+# 4 GET /portfolios/loss-experience (core/app/loss_experience.py):
 Per portfolio: the same six figures summed over perils, plus dkk_lost = incurred − earned premium (positive = losing money). dkk_lost leaves out expenses, so it is not an underwriting result. A top-level `book` (the whole book) is there to benchmark against.
 Ranking (my choice): loss ratio, worst first. It doesn't depend on portfolio size, and the brief defines it. All 12 portfolios are a similar size (6.1–7.4M DKK premium, 880–1,070 policies, 284–336 claims), so credibility weighting wasn't needed. ?order=dkk_lost (DKK lost, most first) and ?order=largest_claim (largest single claim, biggest first) are alternatives. All orders sort descending, ties broken by portfolio_id; any other value gets a 422. Options are documented in the README and in Swagger (enum + description).
 One query: the pol/clm CTEs (FX + incurred rules) are now shared by both endpoints, so the rules live in one place. GROUP BY ROLLUP (portfolio_id) gives the book row exactly in SQL, so it isn't summed from rounded rows.
 Plausibility: portfolio LRs run 0.645–1.040, book 0.803. Only PF-03 is above 1, losing 262,739 DKK. Loss ratio and dkk_lost agree on the order except for a PF-04/PF-06 swap. By largest claim, PF-01 comes second (363k): that's CLM-901444, so it depends on the abs() sign decision in # 3.
 Independent check: tests/test_loss_experience.py rolls the stdlib recompute up per portfolio and for the book, compares every field, and checks the order for all three ?order values. The item-1 tests are unchanged and still pass, which shows the CTE refactor didn't move any number. Curl matched the profiling numbers computed from the raw CSVs before the code was written.
 Trivial choices (Claude): names IN_DKK, PORTFOLIOS, dkk_lost; sorting in Python (12 rows) rather than a SQL CASE.
+Layout (Claude): both loss endpoints + their SQL live in app/loss_experience.py as an APIRouter mounted by main.py. Named loss_experience.py, not loss-experience.py: a hyphen is not importable in Python. The engine moved to app/db.py so loss_experience.py and main.py can both import it without a circular import; main.py still exposes `engine` (test_load.py imports it from there).
+
+# 5 GET /report, data-quality report (core/app/report.py):
+Reads the excluded_rows / flagged_rows written by the load (# 2): `loaded` row counts per table, `excluded` (dropped) as count per file + reason, `flagged` (kept, but fixed or suspicious) as count per file + issue (reason prefix before ":"). Today: 260 excluded (orphan claims), 5,640 flags over 7 issues.
+Row ids (my choice): `?excludedIDs=true` (default false) adds the excluded claim ids. Flagged ids are never listed (5,640 rows); they stay queryable in flagged_rows.
+Independent check: tests/test_report.py recounts the orphan claims (count + ids) and the peril fixes from the raw CSVs with stdlib csv; the full flag recount is already in test_load.py.
+Trivial choices (Claude): an APIRouter in report.py like loss_experience.py; Python param excluded_ids aliased to excludedIDs.
 
 # **What I built**
 

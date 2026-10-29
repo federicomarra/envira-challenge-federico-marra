@@ -75,6 +75,24 @@ curl -s "localhost:8000/portfolios/loss-experience?order=dkk_lost"
 curl -s "localhost:8000/portfolios/loss-experience?order=largest_claim"
 ```
 
+Data-quality report: what the load excluded (dropped) and flagged (kept, but fixed or suspicious), with counts per reason:
+
+```bash
+curl -s localhost:8000/report
+```
+
+```text
+{"loaded":{"assets":4200,"policies":11560,"claims":4249,"fx_rates":168},
+ "excluded":[{"source_file":"claims.csv","reason":"orphan policy_id","count":260}],
+ "flagged":[{"source_file":"policies.csv","issue":"term overlaps","count":1928}, ...]}
+```
+
+Add `?excludedIDs=true` to also list the excluded row ids:
+
+```bash
+curl -s "localhost:8000/report?excludedIDs=true"
+```
+
 Interactive API docs, where the `order` options appear as a dropdown: http://localhost:8000/docs
 
 Inspect the database (published on 127.0.0.1:5432 only):
@@ -111,12 +129,16 @@ docker compose down
 ├── core/                          # FastAPI service
 │   ├── app/
 │   │   ├── __init__.py
+│   │   ├── db.py                  # SQLAlchemy engine (DATABASE_URL)
 │   │   ├── load.py                # CSV cleaning + load into Postgres on startup
-│   │   └── main.py                # App, DB engine, startup load, GET /health, GET /portfolios/{id}/loss-experience, GET /portfolios/loss-experience
+│   │   ├── loss_experience.py     # SQL + GET /portfolios/{id}/loss-experience, GET /portfolios/loss-experience
+│   │   ├── main.py                # App, startup load, GET /health, mounts the loss_experience and report routers
+│   │   └── report.py              # GET /report: excluded / flagged counts per reason (+ excluded ids on request)
 │   ├── tests/
 │   │   ├── test_health.py         # pytest, against the real DB
 │   │   ├── test_load.py           # DB vs independent stdlib-csv recount; bad-row exclusion
-│   │   └── test_loss_experience.py # both endpoints vs independent stdlib-csv recompute (every portfolio x peril, every portfolio, book, ranking)
+│   │   ├── test_loss_experience.py # both endpoints vs independent stdlib-csv recompute (every portfolio x peril, every portfolio, book, ranking)
+│   │   └── test_report.py         # GET /report vs independent stdlib-csv recount (orphan claims + ids, peril fixes)
 │   ├── pyproject.toml             # Dependencies (uv)
 │   ├── uv.lock                    # Locked dependency versions
 │   ├── .dockerignore
