@@ -46,7 +46,36 @@ curl -s localhost:8000/portfolios/PF-01/loss-experience
   "incurred_loss_dkk":398604.73,"loss_ratio":0.596,"claim_count":11,"largest_claim_dkk":67110.75}, ...]}
 ```
 
-Interactive API docs: http://localhost:8000/docs
+Compare all portfolios. Each row has the same figures summed over perils, plus `dkk_lost` = incurred − earned premium (positive means losing money). `book` is the whole book, there to benchmark against:
+
+```bash
+curl -s localhost:8000/portfolios/loss-experience
+```
+
+```text
+{"order":"loss_ratio","book":{"policy_count":11560,"earned_premium_dkk":79771396.34,"incurred_loss_dkk":64093566.22,
+  "loss_ratio":0.8035,"claim_count":3676,"largest_claim_dkk":455259.37,"dkk_lost":-15677830.12},
+ "portfolios":[{"portfolio_id":"PF-03","policy_count":958,"earned_premium_dkk":6586893.07,"incurred_loss_dkk":6849631.97,
+  "loss_ratio":1.0399,"claim_count":336,"largest_claim_dkk":455259.37,"dkk_lost":262738.91}, ...]}
+```
+
+Ranking is worst first (descending), with ties broken by `portfolio_id`. Pick it with `?order=`. Any other value returns 422:
+
+| `order` | sorts by |
+|---|---|
+| `loss_ratio` (default) | incurred / earned premium |
+| `dkk_lost` | incurred − earned premium, in DKK |
+| `largest_claim` | largest single claim, in DKK |
+
+```bash
+curl -s "localhost:8000/portfolios/loss-experience?order=dkk_lost"
+```
+
+```bash
+curl -s "localhost:8000/portfolios/loss-experience?order=largest_claim"
+```
+
+Interactive API docs, where the `order` options appear as a dropdown: http://localhost:8000/docs
 
 Inspect the database (published on 127.0.0.1:5432 only):
 
@@ -83,11 +112,11 @@ docker compose down
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── load.py                # CSV cleaning + load into Postgres on startup
-│   │   └── main.py                # App, DB engine, startup load, GET /health, GET /portfolios/{id}/loss-experience
+│   │   └── main.py                # App, DB engine, startup load, GET /health, GET /portfolios/{id}/loss-experience, GET /portfolios/loss-experience
 │   ├── tests/
 │   │   ├── test_health.py         # pytest, against the real DB
 │   │   ├── test_load.py           # DB vs independent stdlib-csv recount; bad-row exclusion
-│   │   └── test_loss_experience.py # endpoint vs independent stdlib-csv recompute of every portfolio x peril
+│   │   └── test_loss_experience.py # both endpoints vs independent stdlib-csv recompute (every portfolio x peril, every portfolio, book, ranking)
 │   ├── pyproject.toml             # Dependencies (uv)
 │   ├── uv.lock                    # Locked dependency versions
 │   ├── .dockerignore

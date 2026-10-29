@@ -42,6 +42,21 @@ def recompute():
     return out
 
 
+def by_portfolio():
+    """recompute() rolled up per portfolio, plus the whole book under key None."""
+    out = defaultdict(lambda: {"policy_count": 0, "earned_premium_dkk": 0.0, "incurred_loss_dkk": 0.0,
+                               "claim_count": 0, "largest_claim_dkk": 0.0})
+    for (pf, _), e in recompute().items():
+        for t in (out[pf], out[None]):
+            for field in ("policy_count", "earned_premium_dkk", "incurred_loss_dkk", "claim_count"):
+                t[field] += e[field]
+            t["largest_claim_dkk"] = max(t["largest_claim_dkk"], e["largest_claim_dkk"] or 0)
+    for t in out.values():
+        t["loss_ratio"] = t["incurred_loss_dkk"] / t["earned_premium_dkk"]
+        t["dkk_lost"] = t["incurred_loss_dkk"] - t["earned_premium_dkk"]
+    return out
+
+
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as c:  # runs the lifespan, which loads the CSVs
@@ -75,3 +90,34 @@ def test_pf01_subsidence_pinned(client):
 
 def test_unknown_portfolio_is_404(client):
     assert client.get("/portfolios/PF-99/loss-experience").status_code == 404
+
+
+def test_all_portfolios_match_independent_recompute(client):
+    want = by_portfolio()
+    r = client.get("/portfolios/loss-experience").json()
+    got = {p.pop("portfolio_id"): p for p in r["portfolios"]} | {None: r["book"]}
+
+    assert got.keys() == want.keys()
+    for k, w in want.items():
+        g = got[k]
+        assert (g["policy_count"], g["claim_count"]) == (w["policy_count"], w["claim_count"]), k
+        for field in ("earned_premium_dkk", "incurred_loss_dkk", "largest_claim_dkk", "dkk_lost"):
+            assert g[field] == approx(w[field], abs=0.01), (k, field)
+        assert g["loss_ratio"] == approx(w["loss_ratio"], abs=1e-4), k
+
+
+@pytest.mark.parametrize("query, order, field", [
+    ("", "loss_ratio", "loss_ratio"),
+    ("?order=loss_ratio", "loss_ratio", "loss_ratio"),
+    ("?order=dkk_lost", "dkk_lost", "dkk_lost"),
+    ("?order=largest_claim", "largest_claim", "largest_claim_dkk"),
+])
+def test_all_portfolios_ranked_worst_first(client, query, order, field):
+    want = {pf: w for pf, w in by_portfolio().items() if pf is not None}
+    r = client.get(f"/portfolios/loss-experience{query}").json()
+    assert r["order"] == order
+    assert [p["portfolio_id"] for p in r["portfolios"]] == sorted(want, key=lambda pf: (-want[pf][field], pf))
+
+
+def test_unknown_order_is_422(client):
+    assert client.get("/portfolios/loss-experience?order=bogus").status_code == 422

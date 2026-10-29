@@ -39,6 +39,14 @@ Sensitivity: the negative-paid policy is the one that moves the answer. Book LR 
 Plausibility: across all 60 portfolio x peril cells, LR ranges 0.25-3.62 (nothing > 10x or ~0). Fire runs highest in every portfolio (up to 3.6); that's a finding, not a data error.
 Independent check: tests/test_loss_experience.py recomputes every portfolio x peril from the raw CSVs with stdlib csv (no SQL, no pandas, no app.load) and compares all six fields. PF-01 subsidence is also pinned to hand-checked figures. Curl output for PF-01 matched the hand computation done before the code was written.
 
+# 4 GET /portfolios/loss-experience (core/app/main.py):
+Per portfolio: the same six figures summed over perils, plus dkk_lost = incurred − earned premium (positive = losing money). dkk_lost leaves out expenses, so it is not an underwriting result. A top-level `book` (the whole book) is there to benchmark against.
+Ranking (my choice): loss ratio, worst first. It doesn't depend on portfolio size, and the brief defines it. All 12 portfolios are a similar size (6.1–7.4M DKK premium, 880–1,070 policies, 284–336 claims), so credibility weighting wasn't needed. ?order=dkk_lost (DKK lost, most first) and ?order=largest_claim (largest single claim, biggest first) are alternatives. All orders sort descending, ties broken by portfolio_id; any other value gets a 422. Options are documented in the README and in Swagger (enum + description).
+One query: the pol/clm CTEs (FX + incurred rules) are now shared by both endpoints, so the rules live in one place. GROUP BY ROLLUP (portfolio_id) gives the book row exactly in SQL, so it isn't summed from rounded rows.
+Plausibility: portfolio LRs run 0.645–1.040, book 0.803. Only PF-03 is above 1, losing 262,739 DKK. Loss ratio and dkk_lost agree on the order except for a PF-04/PF-06 swap. By largest claim, PF-01 comes second (363k): that's CLM-901444, so it depends on the abs() sign decision in # 3.
+Independent check: tests/test_loss_experience.py rolls the stdlib recompute up per portfolio and for the book, compares every field, and checks the order for all three ?order values. The item-1 tests are unchanged and still pass, which shows the CTE refactor didn't move any number. Curl matched the profiling numbers computed from the raw CSVs before the code was written.
+Trivial choices (Claude): names IN_DKK, PORTFOLIOS, dkk_lost; sorting in Python (12 rows) rather than a SQL CASE.
+
 # **What I built**
 
 # **What I deliberately did not build, and why**
