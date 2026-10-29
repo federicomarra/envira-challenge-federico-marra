@@ -35,6 +35,17 @@ curl -s localhost:8000/health
 # {"status":"ok","db":"ok"}
 ```
 
+Loss experience for one portfolio (`PF-01` … `PF-12`), per peril, all money in DKK. An unknown portfolio returns 404:
+
+```bash
+curl -s localhost:8000/portfolios/PF-01/loss-experience
+```
+
+```text
+{"portfolio_id":"PF-01","perils":[{"peril":"fire","policy_count":175,"earned_premium_dkk":668775.33,
+  "incurred_loss_dkk":398604.73,"loss_ratio":0.596,"claim_count":11,"largest_claim_dkk":67110.75}, ...]}
+```
+
 Interactive API docs: http://localhost:8000/docs
 
 Inspect the database (published on 127.0.0.1:5432 only):
@@ -72,10 +83,11 @@ docker compose down
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── load.py                # CSV cleaning + load into Postgres on startup
-│   │   └── main.py                # App, DB engine, startup load, GET /health
+│   │   └── main.py                # App, DB engine, startup load, GET /health, GET /portfolios/{id}/loss-experience
 │   ├── tests/
 │   │   ├── test_health.py         # pytest, against the real DB
-│   │   └── test_load.py           # DB vs independent stdlib-csv recount; bad-row exclusion
+│   │   ├── test_load.py           # DB vs independent stdlib-csv recount; bad-row exclusion
+│   │   └── test_loss_experience.py # endpoint vs independent stdlib-csv recompute of every portfolio x peril
 │   ├── pyproject.toml             # Dependencies (uv)
 │   ├── uv.lock                    # Locked dependency versions
 │   ├── .dockerignore

@@ -25,11 +25,19 @@ Kept but flagged (flagged_rows, one entry per issue; reason prefix before ":" gr
 - fixed loss_date / reported_date: DD-MM-YYYY -> stored as DATE (YYYY-MM-DD), original value kept in the reason: 550 / 548 claims. Read as DD-MM: no value has a 2nd part > 12, 690 have a 1st part > 12.
 - term overlaps: later policy on the same asset+peril whose term overlaps an earlier one by > 7 days (earlier expiry - later inception): 1,928. Another 84 pairs overlap by <= 7 days (renewal slack) and are not flagged. All policies kept.
 - loss_date before policy inception: 310 claims, kept on the stated policy (77 had exactly one other covering policy on the same asset+peril, 6 had two, 227 none).
-- negative paid_amount: 262 settled claims, kept as-is (lowers incurred loss).
+- negative paid_amount: 262 settled claims, loaded raw; treated as a sign error, so the endpoint uses abs(paid_amount). Why: all are settled with reserve 0, none has a matching positive payment on the same policy, and their sizes look like normal claims (median 6.2k vs 10.2k), so they are not recoveries.
 - settled with reserve_amount > 0: 721, loaded raw; the endpoint will use paid only for settled claims, per BRIEF.
 Not flagged: claim currency != policy currency (859), expected per BRIEF.
 Independent check: tests/test_load.py recounts every table, exclusion and flag from the raw CSVs with stdlib csv and compares to the DB.
 Trivial choices (Claude): clean() (pure, testable) + load() (DB) split; summary logged to uvicorn's logger; validation of unexpected rows covered by a tiny tmp_path CSV test.
+
+# 3 GET /portfolios/{portfolio_id}/loss-experience (core/app/main.py, one SQL query):
+Per peril: policy_count, earned_premium_dkk (full annual premium), incurred_loss_dkk (settled = paid, open = paid + reserve, withdrawn/declined = 0), loss_ratio (incurred / earned, 4 dp), claim_count and largest_claim_dkk (open + settled only, so incurred / count is average severity). Money rounded to 2 dp. Unknown portfolio -> 404.
+FX: premium at the month-end rate of its inception month, claim at the month-end rate of its reported month. EUR only moves 7.43-7.46, so the choice changes the book LR by < 0.01%. EUR labels checked as genuine: the DKK/EUR premium-rate ratio per peril is ~7.45.
+Policies and claims are grouped per peril separately and then joined, so a policy's premium is never multiplied by its claim count.
+Sensitivity: the negative-paid policy is the one that moves the answer. Book LR is 0.80 with abs vs 0.70 kept as-is. PF-01 subsidence goes 0.85 vs 0.14: its largest claim is CLM-901444, -48,749.17 EUR in source (~363k DKK).
+Plausibility: across all 60 portfolio x peril cells, LR ranges 0.25-3.62 (nothing > 10x or ~0). Fire runs highest in every portfolio (up to 3.6); that's a finding, not a data error.
+Independent check: tests/test_loss_experience.py recomputes every portfolio x peril from the raw CSVs with stdlib csv (no SQL, no pandas, no app.load) and compares all six fields. PF-01 subsidence is also pinned to hand-checked figures. Curl output for PF-01 matched the hand computation done before the code was written.
 
 # **What I built**
 
