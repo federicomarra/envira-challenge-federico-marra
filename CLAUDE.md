@@ -88,6 +88,12 @@ pytest -q -W error
 
 Commit after each working step, small and descriptive. Never commit `data/`, the data zip, or secrets.
 
+## 8. DECISIONS.md
+Always update the DECISIONS.md file after any change or decision I make.
+
+## 10. README.md
+Always update the README.md whenever something changes
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
