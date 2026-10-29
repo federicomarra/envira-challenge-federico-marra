@@ -25,7 +25,7 @@ CREATE TABLE claims (
     policy_id      TEXT NOT NULL REFERENCES policies (policy_id),
     loss_date      DATE NOT NULL,
     reported_date  DATE NOT NULL,
-    paid_amount    NUMERIC(14, 2) NOT NULL,  -- negatives present in source; policy not decided yet
+    paid_amount    NUMERIC(14, 2) NOT NULL,  -- negatives present in source; kept as-is, flagged
     reserve_amount NUMERIC(14, 2) NOT NULL CHECK (reserve_amount >= 0),
     currency       TEXT NOT NULL CHECK (currency IN ('DKK', 'EUR')),
     status         TEXT NOT NULL CHECK (status IN ('open', 'settled', 'withdrawn', 'declined'))
@@ -42,5 +42,13 @@ CREATE TABLE excluded_rows (
     id          SERIAL PRIMARY KEY,
     source_file TEXT NOT NULL,  -- e.g. 'claims.csv'
     row_id      TEXT NOT NULL,  -- the row's own id, e.g. claim_id
+    reason      TEXT NOT NULL
+);
+
+-- Rows that were loaded but fixed or look suspicious; one entry per issue.
+CREATE TABLE flagged_rows (
+    id          SERIAL PRIMARY KEY,
+    source_file TEXT NOT NULL,
+    row_id      TEXT NOT NULL,
     reason      TEXT NOT NULL
 );
