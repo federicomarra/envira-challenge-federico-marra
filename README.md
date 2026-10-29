@@ -26,7 +26,7 @@ On startup core loads `./data/*.csv` into Postgres. It replaces whatever is alre
 Loaded assets 4200, policies 11560, claims 4249, fx_rates 168; excluded 260 rows; flagged 5640 issues
 ```
 
-Rows that were left out go to `excluded_rows`. Rows that were kept but fixed or look suspicious go to `flagged_rows`. The rules are in DECISIONS.md.
+Rows that were left out go to `excluded_rows`. Rows that were kept but fixed or look suspicious go to `flagged_rows`. The rules are in DECISIONS.md; `GET /report` (below) summarizes both.
 
 Check the API is up and can reach the database:
 
@@ -101,7 +101,7 @@ Inspect the database (published on 127.0.0.1:5432 only):
 docker compose exec db psql -U envira -d envira -c '\dt'
 ```
 
-What was excluded or flagged on load:
+The same counts as `GET /report`, straight from the tables (each row also has its full reason and row id):
 
 ```bash
 docker compose exec db psql -U envira -d envira -c "select reason, count(*) from excluded_rows group by 1"

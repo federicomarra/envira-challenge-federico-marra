@@ -6,7 +6,7 @@ Keep it short, ideally 10 to 20 lines. Somewhere in those sections, briefly ment
 
 # 1 setup skeleton:
 DB: PostgreSQL 16 (postgres:16-alpine), own database/Dockerfile, schema in database/init/schema.sql (run by postgres entrypoint).
-Schema: only cleaned data. assets/policies/claims/fx_rates typed (NUMERIC money, DATE dates, fx month = first of month) with PK/FK and CHECKs (currency, status, peril, region, asset_type, expiry > inception, premium/sum insured > 0, reserve >= 0); excluded_rows (file, row id, reason) for the data-quality report.
+Schema: only cleaned data. assets/policies/claims/fx_rates typed (NUMERIC money, DATE dates, fx month = first of month) with PK/FK and CHECKs (currency, status, peril, region, asset_type, expiry > inception, premium/sum insured > 0, reserve >= 0); excluded_rows and flagged_rows (file, row id, reason), read by the data-quality report (# 5).
 Data policy: see # 2.
 No volume: ephemeral DB, fresh every start.
 Postgres published on 127.0.0.1:5432 only (for local tests).
